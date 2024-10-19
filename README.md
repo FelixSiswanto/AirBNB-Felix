@@ -1,5 +1,3 @@
 # Project Overview
 
-Airbnb is an online marketplace that connects travelers with hosts who offer accommodations, ranging from single rooms to entire homes, allowing for unique and localized travel experiences.
-
-InsideAirbnb utilizes publicly available Airbnb data to analyze and visualize trends in the short-term rental market. By aggregating information on listings, prices, occupancy rates, and host activity, the platform provides insights into the dynamics of local Airbnb markets
+If you have been redirected to this page in order to access the SQL code, please press on the AirBNB SQL CODE file. You will be able to view the codes that I wrote. I have also uploaded the csv files for all the tables that I used. 
