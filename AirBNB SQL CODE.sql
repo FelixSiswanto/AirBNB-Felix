@@ -9,8 +9,7 @@ FROM [dbo].[Available]
 ---FIND REVENUE = occupancy x price
 
 SELECT
-    *,
-    ((365 - dbo.Available.availability_365) / 365) * dbo.Main.Price AS TotalRevenue
+    DISTINCT(room_type)
 FROM dbo.Main
     LEFT JOIN dbo.Available 
         ON dbo.Available.id = dbo.Main.id
@@ -187,6 +186,7 @@ ORDER BY
 
 
 
+SELECT*FROM #TempTargetRegionRoom
 
 --- Find the top performing room type per area
 --- Now we have the choice to invest, but which one? I want to find which room type is most appropriate per area. 
@@ -217,7 +217,7 @@ SELECT
 	Subquery.Category,
     COUNT(Subquery.id) AS ListingCount,
     SUM(Subquery.TotalRevenue) / COUNT(Subquery.id)  AS AverageTotalRevenue,
-	RANK()OVER( PARTITION BY neighbourhood_cleansed ORDER BY  SUM(Subquery.TotalRevenue) / COUNT(Subquery.id)) AS Ranking
+	RANK()OVER( PARTITION BY neighbourhood_cleansed ORDER BY  SUM(Subquery.TotalRevenue) / COUNT(Subquery.id) DESC) AS Ranking
 FROM (
     SELECT
         m.id,
@@ -240,6 +240,7 @@ FROM (
         ON m.neighbourhood_cleansed = t.Area 
         AND m.room_type = t.RoomType
 ) AS Subquery
+
 GROUP BY 
     Subquery.neighbourhood_cleansed, 
     Subquery.RoomType,
