@@ -14,7 +14,7 @@ SELECT
 FROM dbo.Main
     LEFT JOIN dbo.Available 
         ON dbo.Available.id = dbo.Main.id
-WHERE neighbourhood_cleansed = 'Hinohara Mura'
+
 
 ----------------------------------------------------------------------------------------Start Geospatial analysis
 
