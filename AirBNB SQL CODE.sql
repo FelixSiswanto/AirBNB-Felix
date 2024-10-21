@@ -1,5 +1,6 @@
 SELECT*FROM [dbo].[Main]
 ---FIND OCCUPANCY
+
 SELECT
 *,
 365 - availability_365 AS Occupancy
@@ -13,6 +14,7 @@ SELECT
 FROM dbo.Main
     LEFT JOIN dbo.Available 
         ON dbo.Available.id = dbo.Main.id
+WHERE neighbourhood_cleansed = 'Hinohara Mura'
 
 ----------------------------------------------------------------------------------------Start Geospatial analysis
 
@@ -61,20 +63,20 @@ FROM (
     GROUP BY a.neighbourhood_cleansed
 ) AS Subquery
 ORDER BY AverageRevenueArea DESC;
---- Here we can see that occupancy does not always equate to high  DailyRevenueArea per place. Hinohara Mura has one of the lowest average occupancy in a year, but given that it is a vacation spot
+--- Here we can see that occupancy does not always equate to high  DailyRevenueArea per place. Hinohara Mura has one of the lowest average occupancy in a year, but given that it is a vacation spot, I assume that the price of
 -- I want to only focus on the top 15 best performing areas. 
 
 SELECT TOP 15
     neighbourhood_cleansed,
-    AverageRevenueArea,
+    AnnualRevenueArea,
     DailyRevenueArea,
     AverageOccupancyArea,
-    RANK() OVER (ORDER BY AverageRevenueArea DESC) AS RevenueRank
+    RANK() OVER (ORDER BY AnnualRevenueArea DESC) AS RevenueRank
 INTO TargetRegion
 FROM (
     SELECT
         a.neighbourhood_cleansed,
-        SUM(CAST(365 - b.availability_365 AS BIGINT) * a.price) / COUNT(DISTINCT a.id) AS AverageRevenueArea,
+        SUM(CAST(365 - b.availability_365 AS BIGINT) * a.price) / COUNT(DISTINCT a.id) AS AnnualRevenueArea,
         SUM(CAST(365 - b.availability_365 AS BIGINT) * a.price) / (365 * COUNT(DISTINCT a.id)) AS DailyRevenueArea,
         SUM(365 - b.availability_365) / COUNT(DISTINCT a.id) AS AverageOccupancyArea
     FROM dbo.Main a
@@ -82,8 +84,8 @@ FROM (
         ON a.id = b.id
     GROUP BY a.neighbourhood_cleansed
 ) AS Subquery
-ORDER BY AverageRevenueArea DESC;
-	
+ORDER BY AnnualRevenueArea DESC;
+
 SELECT*FROM [dbo].[TargetRegion]
 
 ------------------------------------------------- We will only analyze our target area based on these regions from now. 
@@ -150,8 +152,7 @@ GROUP BY
 ORDER BY 
     ps.Area;
 
-
-	WITH PriceStats AS (
+WITH PriceStats AS (
     SELECT 
         neighbourhood_cleansed AS Area,
         room_type AS RoomType,
@@ -162,6 +163,7 @@ ORDER BY
 )
 
 -- Create a temporary table from the CTE
+
 SELECT 
     ps.Area,
     ps.RoomType,
@@ -189,8 +191,8 @@ ORDER BY
 --- Find the top performing room type per area
 --- Now we have the choice to invest, but which one? I want to find which room type is most appropriate per area. 
 
-
 SELECT *
+INTO #TempTargetRegionRoom
 FROM #TempPriceStats tps
 WHERE tps.AverageRevenueByMedianPrice = (
     SELECT MAX(AverageRevenueByMedianPrice) 
@@ -204,42 +206,45 @@ ORDER BY tps.AverageRevenueByMedianPrice DESC
 --Lower volatility: Demand-driven properties tend to have less price fluctuation.
 
 --- Further qeustions that we can ask. Assuming that we have chosen an area and know the exact roomtype. What should the room consist of?
---- Assume that we have decided to open an airbnb in Shibuya Ku, lets analyze
 
-SELECT
-  
-	dbo.Main.id,
-	dbo.Main.accommodates,
-	dbo.Main.bathrooms,
-	dbo.Main.bedrooms,
-	dbo.Main.beds,
-	price,
-    ((365 - dbo.Available.availability_365) / 365) * dbo.Main.Price AS TotalRevenue
-INTO #Shibuyadata
-FROM dbo.Main
-    LEFT JOIN dbo.Available 
-        ON dbo.Available.id = dbo.Main.id
-WHERE neighbourhood_cleansed = 'Shibuya Ku' and room_type = 'Entire home/apt'
+
+
 
 
 SELECT
-COUNT(CASE WHEN accommodates > 7 THEN id ELSE NULL END) AS "Big_capacity",
-COUNT(CASE WHEN accommodates < 7 AND accommodates > 2  THEN id ELSE NULL END) AS "Mid_capacity",
-COUNT(CASE WHEN accommodates <= 2 THEN id ELSE NULL END) AS "Small_capacity"
-FROM #Shibuyadata
+    Subquery.RoomType,
+    Subquery.neighbourhood_cleansed,
+	Subquery.Category,
+    COUNT(Subquery.id) AS ListingCount,
+    SUM(Subquery.TotalRevenue) / COUNT(Subquery.id)  AS AverageTotalRevenue,
+	RANK()OVER( PARTITION BY neighbourhood_cleansed ORDER BY  SUM(Subquery.TotalRevenue) / COUNT(Subquery.id)) AS Ranking
+FROM (
+    SELECT
+        m.id,
+        m.neighbourhood_cleansed,
+        m.room_type AS RoomType,
+        ((365 - COALESCE(a.availability_365, 0)) * CAST(COALESCE(m.Price, 0) AS DECIMAL(18, 2))) AS TotalRevenue,
+        CASE 
+            WHEN m.accommodates >= 7 THEN 'big'
+            WHEN m.accommodates BETWEEN 3 AND 6 THEN 'medium'
+            WHEN m.accommodates <= 2 THEN 'small'
+            ELSE 'check' 
+        END AS Category
+    FROM 
+        [dbo].[Main] m
+    LEFT JOIN 
+        [dbo].[Available] a 
+        ON a.id = m.id
+    INNER JOIN 
+        #TempTargetRegionRoom t
+        ON m.neighbourhood_cleansed = t.Area 
+        AND m.room_type = t.RoomType
+) AS Subquery
+GROUP BY 
+    Subquery.neighbourhood_cleansed, 
+    Subquery.RoomType,
+	Subquery.Category;
 
 
-SELECT
-  
-	dbo.Main.id,
-	dbo.Main.accommodates,
-	dbo.Main.bathrooms,
-	dbo.Main.bedrooms,
-	dbo.Main.beds,
-	price,
-    ((365 - dbo.Available.availability_365) / 365) * dbo.Main.Price AS TotalRevenue
 
-FROM dbo.Main
-    LEFT JOIN dbo.Available 
-        ON dbo.Available.id = dbo.Main.id
-WHERE neighbourhood_cleansed = 'Shibuya Ku' and room_type = 'Entire home/apt' and accommodates < 7 AND accommodates > 2
+
