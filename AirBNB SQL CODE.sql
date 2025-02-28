@@ -186,7 +186,6 @@ ORDER BY
 
 
 
-SELECT*FROM #TempTargetRegionRoom
 
 --- Find the top performing room type per area
 --- Now we have the choice to invest, but which one? I want to find which room type is most appropriate per area. 
@@ -216,14 +215,16 @@ SELECT
     Subquery.neighbourhood_cleansed,
 	Subquery.Category,
     COUNT(Subquery.id) AS ListingCount,
-    SUM(Subquery.TotalRevenue) / COUNT(Subquery.id)  AS AverageTotalRevenue,
-	RANK()OVER( PARTITION BY neighbourhood_cleansed ORDER BY  SUM(Subquery.TotalRevenue) / COUNT(Subquery.id) DESC) AS Ranking
+    SUM(Subquery.PerPersonRevenue) / COUNT(Subquery.id)  AS AveragePerPersonRevenue,
+	RANK()OVER( PARTITION BY neighbourhood_cleansed ORDER BY     SUM(Subquery.PerPersonRevenue) / COUNT(Subquery.id) DESC) AS Ranking
 FROM (
     SELECT
         m.id,
         m.neighbourhood_cleansed,
         m.room_type AS RoomType,
         ((365 - COALESCE(a.availability_365, 0)) * CAST(COALESCE(m.Price, 0) AS DECIMAL(18, 2))) AS TotalRevenue,
+		m.accommodates,
+		 ((365 - COALESCE(a.availability_365, 0)) * CAST(COALESCE(m.Price, 0) AS DECIMAL(18, 2))) / m.accommodates AS PerPersonRevenue,
         CASE 
             WHEN m.accommodates >= 7 THEN 'big'
             WHEN m.accommodates BETWEEN 3 AND 6 THEN 'medium'
@@ -245,7 +246,4 @@ GROUP BY
     Subquery.neighbourhood_cleansed, 
     Subquery.RoomType,
 	Subquery.Category;
-
-
-
 
